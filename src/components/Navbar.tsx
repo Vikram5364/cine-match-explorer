@@ -1,11 +1,13 @@
 
 import React from 'react';
 import { Film, Search, User, Heart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 const Navbar = () => {
+  const location = useLocation();
+  
   return (
     <header className="border-b border-cinema-light sticky top-0 z-50 bg-cinema/90 backdrop-blur-sm">
       <div className="container mx-auto px-4 flex items-center justify-between h-16">
@@ -24,10 +26,20 @@ const Navbar = () => {
         </div>
         
         <nav className="flex items-center space-x-4">
-          <Link to="/discover" className="text-sm font-medium hover:text-cinema-accent transition-colors hidden md:block">
+          <Link 
+            to="/discover" 
+            className={`text-sm font-medium hover:text-cinema-accent transition-colors hidden md:block ${
+              location.pathname === '/discover' ? 'text-cinema-accent' : ''
+            }`}
+          >
             Discover
           </Link>
-          <Link to="/favorites" className="text-sm font-medium hover:text-cinema-accent transition-colors hidden md:block">
+          <Link 
+            to="/favorites" 
+            className={`text-sm font-medium hover:text-cinema-accent transition-colors hidden md:block ${
+              location.pathname === '/favorites' ? 'text-cinema-accent' : ''
+            }`}
+          >
             <Heart className="w-4 h-4 inline mr-1" />
             Favorites
           </Link>

@@ -1,17 +1,84 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import MovieGrid from '@/components/MovieGrid';
 import GenreFilter from '@/components/GenreFilter';
-import { mockMovies, getRecommendedMovies, getTopRatedMovies, genres, getMoviesByGenre } from '@/data/mockMovies';
+import { fetchTopRatedMovies, fetchRecommendedMovies, fetchMoviesByGenre } from '@/services/movieService';
+import { genres } from '@/data/mockMovies';
+import { Movie } from '@/components/MovieCard';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [selectedGenre, setSelectedGenre] = useState('All');
-  const featuredMovie = mockMovies[0];
-  const topRatedMovies = getTopRatedMovies(5);
-  const recommendedMovies = getRecommendedMovies(10);
-  const filteredMovies = getMoviesByGenre(selectedGenre);
+  const [featuredMovie, setFeaturedMovie] = useState<Movie | null>(null);
+  const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
+  const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
+  const [filteredMovies, setFilteredMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        const [topRated, recommended] = await Promise.all([
+          fetchTopRatedMovies(5),
+          fetchRecommendedMovies(10)
+        ]);
+        
+        setTopRatedMovies(topRated);
+        setRecommendedMovies(recommended);
+        
+        // Set the first top-rated movie as the featured movie
+        if (topRated.length > 0) {
+          setFeaturedMovie(topRated[0]);
+        }
+        
+        // Load filtered movies based on selected genre
+        const filtered = await fetchMoviesByGenre(selectedGenre);
+        setFilteredMovies(filtered);
+        
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: "Failed to load movies",
+          description: "Please try again later.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [toast]);
+  
+  // Update filtered movies when genre changes
+  useEffect(() => {
+    const loadFilteredMovies = async () => {
+      try {
+        const filtered = await fetchMoviesByGenre(selectedGenre);
+        setFilteredMovies(filtered);
+      } catch (error) {
+        console.error('Error loading filtered movies:', error);
+      }
+    };
+    
+    loadFilteredMovies();
+  }, [selectedGenre]);
+
+  if (loading || !featuredMovie) {
+    return (
+      <div className="min-h-screen bg-cinema-gradient">
+        <Navbar />
+        <div className="flex items-center justify-center h-96">
+          <div className="animate-spin h-12 w-12 border-4 border-cinema-accent border-t-transparent rounded-full"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cinema-gradient">

@@ -5,28 +5,76 @@ import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Star, Play, Heart, Share2, Clock, Calendar, User } from 'lucide-react';
 import MovieGrid from '@/components/MovieGrid';
-import { mockMovies, getRecommendedMovies } from '@/data/mockMovies';
+import { fetchMovieById, fetchRecommendedMovies, rateMovie } from '@/services/movieService';
 import { Movie } from '@/components/MovieCard';
+import { useToast } from '@/hooks/use-toast';
 
 const MovieDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [movie, setMovie] = useState<Movie | null>(null);
-  const similarMovies = getRecommendedMovies(5);
+  const [similarMovies, setSimilarMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const { toast } = useToast();
   
   useEffect(() => {
-    // In a real app, fetch movie details from API
-    const foundMovie = mockMovies.find(m => m.id === id);
-    if (foundMovie) {
-      setMovie(foundMovie);
-    }
-  }, [id]);
+    const loadMovieData = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        
+        // Fetch movie details and similar movies in parallel
+        const [movieData, recommendedData] = await Promise.all([
+          fetchMovieById(id),
+          fetchRecommendedMovies(5) // In a real app, we'd fetch similar movies based on the current movie
+        ]);
+        
+        setMovie(movieData);
+        setSimilarMovies(recommendedData);
+      } catch (error) {
+        console.error('Error loading movie:', error);
+        toast({
+          title: "Error loading movie",
+          description: "Please try again later.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (!movie) {
+    loadMovieData();
+  }, [id, toast]);
+
+  const handleRateMovie = async (rating: number) => {
+    if (!id) return;
+    
+    try {
+      await rateMovie(id, rating);
+      setUserRating(rating);
+      
+      toast({
+        title: "Rating submitted",
+        description: `You rated this movie ${rating} stars.`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Error rating movie:', error);
+      toast({
+        title: "Failed to submit rating",
+        description: "Please try again later.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  if (loading || !movie) {
     return (
       <div>
         <Navbar />
         <div className="cinema-container flex items-center justify-center min-h-[60vh]">
-          <p>Loading movie details...</p>
+          <div className="animate-spin h-8 w-8 border-4 border-cinema-accent border-t-transparent rounded-full"></div>
         </div>
       </div>
     );
@@ -82,7 +130,7 @@ const MovieDetail = () => {
                 
                 <div className="flex flex-wrap gap-2">
                   {movie.genres.map(genre => (
-                    <Link to={`/genre/${genre}`} key={genre}>
+                    <Link to={`/discover?genre=${genre}`} key={genre}>
                       <span className="bg-cinema-light text-xs font-medium px-3 py-1 rounded-full hover:bg-cinema-muted transition-colors">
                         {genre}
                       </span>
@@ -175,14 +223,26 @@ const MovieDetail = () => {
                 <h2 className="text-xl font-bold">Rate This Movie</h2>
                 <div className="flex justify-center space-x-1">
                   {[1, 2, 3, 4, 5].map((rating) => (
-                    <button key={rating} className="p-1">
-                      <Star className="h-8 w-8 hover:fill-cinema-accent hover:stroke-cinema-accent transition-colors" />
+                    <button 
+                      key={rating} 
+                      className="p-1"
+                      onClick={() => handleRateMovie(rating)}
+                    >
+                      <Star 
+                        className={`h-8 w-8 transition-colors ${
+                          userRating && rating <= userRating 
+                            ? 'fill-cinema-accent stroke-cinema-accent' 
+                            : 'hover:fill-cinema-accent hover:stroke-cinema-accent'
+                        }`} 
+                      />
                     </button>
                   ))}
                 </div>
-                <Button className="w-full bg-cinema-accent text-cinema hover:bg-cinema-accent-hover">
-                  Submit Rating
-                </Button>
+                {userRating && (
+                  <div className="text-center text-cinema-accent font-medium">
+                    You rated this movie {userRating} stars
+                  </div>
+                )}
               </div>
             </div>
           </div>
