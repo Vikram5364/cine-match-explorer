@@ -30,9 +30,11 @@ export function useRealtimeData<T>(
     queryFn: fetchFn,
     refetchInterval: enabled ? pollingInterval : false,
     refetchIntervalInBackground: true,
-    onSuccess: (data) => {
-      setLastUpdated(new Date());
-      if (onUpdate) onUpdate(data);
+    onSettled: (data) => {
+      if (data) {
+        setLastUpdated(new Date());
+        if (onUpdate) onUpdate(data as T);
+      }
     }
   });
   
