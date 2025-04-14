@@ -30,13 +30,21 @@ export function useRealtimeData<T>(
     queryFn: fetchFn,
     refetchInterval: enabled ? pollingInterval : false,
     refetchIntervalInBackground: true,
-    onSettled: (data) => {
-      if (data) {
+    meta: {
+      onSuccess: (data: T) => {
         setLastUpdated(new Date());
-        if (onUpdate) onUpdate(data as T);
+        if (onUpdate) onUpdate(data);
       }
     }
   });
+  
+  // Update last updated whenever data changes
+  useEffect(() => {
+    if (data) {
+      setLastUpdated(new Date());
+      if (onUpdate) onUpdate(data as T);
+    }
+  }, [data, onUpdate]);
   
   // Force manual refresh function
   const refreshData = async () => {
