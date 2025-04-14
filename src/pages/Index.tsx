@@ -1,75 +1,107 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import MovieGrid from '@/components/MovieGrid';
 import GenreFilter from '@/components/GenreFilter';
-import { fetchTopRatedMovies, fetchRecommendedMovies, fetchMoviesByGenre } from '@/services/movieService';
+import { 
+  fetchTopRatedMovies, 
+  fetchRecommendedMovies, 
+  fetchMoviesByGenre,
+  fetchTrendingMovies,
+  subscribeToMovieUpdates
+} from '@/services/movieService';
 import { genres } from '@/data/mockMovies';
 import { Movie } from '@/components/MovieCard';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeData } from '@/hooks/useRealtimeData';
+import { POLLING_INTERVALS } from '@/services/apiConfig';
+import { toast as sonnerToast } from 'sonner';
 
 const Index = () => {
   const [selectedGenre, setSelectedGenre] = useState('All');
   const [featuredMovie, setFeaturedMovie] = useState<Movie | null>(null);
-  const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
-  const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
-  const [filteredMovies, setFilteredMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        
-        const [topRated, recommended] = await Promise.all([
-          fetchTopRatedMovies(5),
-          fetchRecommendedMovies(10)
-        ]);
-        
-        setTopRatedMovies(topRated);
-        setRecommendedMovies(recommended);
-        
-        // Set the first top-rated movie as the featured movie
-        if (topRated.length > 0) {
-          setFeaturedMovie(topRated[0]);
-        }
-        
-        // Load filtered movies based on selected genre
-        const filtered = await fetchMoviesByGenre(selectedGenre);
-        setFilteredMovies(filtered);
-        
-      } catch (error) {
-        console.error('Error loading data:', error);
-        toast({
-          title: "Failed to load movies",
-          description: "Please try again later.",
-          variant: "destructive"
+  
+  // Use real-time data hooks for various movie lists
+  const { 
+    data: topRatedMovies = [], 
+    lastUpdated: topRatedUpdated,
+    isLoading: topRatedLoading 
+  } = useRealtimeData<Movie[]>(
+    ['topRated'], 
+    () => fetchTopRatedMovies(5),
+    { pollingInterval: POLLING_INTERVALS.ratings }
+  );
+  
+  const { 
+    data: recommendedMovies = [], 
+    lastUpdated: recommendedUpdated,
+    isLoading: recommendedLoading 
+  } = useRealtimeData<Movie[]>(
+    ['recommended'], 
+    () => fetchRecommendedMovies(10),
+    { 
+      pollingInterval: POLLING_INTERVALS.recommendations,
+      onUpdate: (movies) => {
+        sonnerToast("Recommendations updated", {
+          description: "We've refreshed your movie recommendations based on recent activity",
+          duration: 3000,
         });
-      } finally {
-        setLoading(false);
       }
-    };
+    }
+  );
+  
+  const { 
+    data: trendingMovies = [], 
+    isLoading: trendingLoading 
+  } = useRealtimeData<Movie[]>(
+    ['trending'], 
+    () => fetchTrendingMovies(5),
+    { pollingInterval: POLLING_INTERVALS.trending }
+  );
+  
+  const { 
+    data: filteredMovies = [], 
+    isLoading: filteredLoading,
+    refreshData: refreshFiltered 
+  } = useRealtimeData<Movie[]>(
+    ['movies', selectedGenre], 
+    () => fetchMoviesByGenre(selectedGenre),
+    { enabled: true }
+  );
+  
+  // Set up real-time updates subscription
+  useEffect(() => {
+    const unsubscribe = subscribeToMovieUpdates((updates) => {
+      console.log("Received real-time updates:", updates);
+      
+      // Show notification for recent movie ratings
+      if (updates.recentlyRated.length > 0) {
+        sonnerToast("Movies recently rated", {
+          description: "Some movies have new ratings from other users",
+        });
+      }
+    });
     
-    loadData();
-  }, [toast]);
+    return () => unsubscribe();
+  }, []);
   
   // Update filtered movies when genre changes
   useEffect(() => {
-    const loadFilteredMovies = async () => {
-      try {
-        const filtered = await fetchMoviesByGenre(selectedGenre);
-        setFilteredMovies(filtered);
-      } catch (error) {
-        console.error('Error loading filtered movies:', error);
-      }
-    };
-    
-    loadFilteredMovies();
-  }, [selectedGenre]);
+    refreshFiltered();
+  }, [selectedGenre, refreshFiltered]);
+  
+  // Set featured movie from top rated
+  useEffect(() => {
+    if (topRatedMovies.length > 0 && !featuredMovie) {
+      setFeaturedMovie(topRatedMovies[0]);
+    }
+  }, [topRatedMovies, featuredMovie]);
+  
+  const isLoading = topRatedLoading || recommendedLoading || !featuredMovie;
 
-  if (loading || !featuredMovie) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-cinema-gradient">
         <Navbar />
@@ -93,6 +125,11 @@ const Index = () => {
             movies={topRatedMovies} 
           />
           
+          <MovieGrid 
+            title="Trending Now" 
+            movies={trendingMovies} 
+          />
+          
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Explore Movies</h2>
@@ -104,12 +141,18 @@ const Index = () => {
             />
             <MovieGrid 
               movies={filteredMovies} 
+              isLoading={filteredLoading}
             />
           </div>
           
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold">Recommended For You</h2>
-            <p className="text-muted-foreground">Based on your preferences</p>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Recommended For You</h2>
+              <div className="text-sm text-muted-foreground">
+                Updated {new Date(recommendedUpdated).toLocaleTimeString()}
+              </div>
+            </div>
+            <p className="text-muted-foreground">Based on your preferences and real-time activity</p>
             <MovieGrid 
               movies={recommendedMovies} 
             />

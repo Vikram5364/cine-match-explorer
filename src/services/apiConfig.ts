@@ -9,6 +9,18 @@ export const API_ENDPOINTS = {
   recommendations: `${API_BASE_URL}/recommendations`,
   users: `${API_BASE_URL}/users`,
   ratings: `${API_BASE_URL}/ratings`,
+  realtime: {
+    movieUpdates: `${API_BASE_URL}/realtime/movies`,
+    ratingUpdates: `${API_BASE_URL}/realtime/ratings`,
+    recommendationUpdates: `${API_BASE_URL}/realtime/recommendations`,
+  }
+};
+
+// Polling intervals in milliseconds
+export const POLLING_INTERVALS = {
+  ratings: 10000,         // 10 seconds
+  recommendations: 30000, // 30 seconds
+  trending: 60000,        // 1 minute
 };
 
 export const handleApiResponse = async (response: Response) => {
