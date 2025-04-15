@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
@@ -43,12 +42,6 @@ const Index = () => {
     () => fetchRecommendedMovies(10),
     { 
       pollingInterval: POLLING_INTERVALS.recommendations,
-      onUpdate: (movies) => {
-        sonnerToast("Recommendations updated", {
-          description: "We've refreshed your movie recommendations based on recent activity",
-          duration: 3000,
-        });
-      }
     }
   );
   
